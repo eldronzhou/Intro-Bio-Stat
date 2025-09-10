@@ -1,0 +1,179 @@
+---
+title: "Week2_1"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+## Importing data
+
+The first step of data analysis is to read the data stored on the computer desk into R environment. Two mostly commonly used formats to store data is text files (.txt) and electronic spreadsheets (.csv/.xlsx). Generally speaking, there are two information required to read a file: 1) how is the field separated, 2) whether there is a header. 
+
+### Comma separated spreadsheets
+
+We will first introduce how to read electronic spreadsheets. For spreadsheets with value separated by comma and have a header (column name), we can use `read_csv` to read the file. We will use covid 19 data downloaded from Our World in Data (OWID) as an example.
+
+```{r}
+library(readr)
+library(dplyr)
+library(data.table)
+dat = read_csv("data/usa_covid.csv")
+```
+
+If you want to read Microsoft Excel spreadsheet, you can either save it as .csv file or use the `readxl` function in the `readxl` package.
+
+### Working directory and file path
+
+In the `read_csv` function, we need to specify the path to the file to be imported. There are two ways to specify the path in R: relative path or full path.
+
+In the example above, we specify the relative path of the csv file. Here, relative means relative to the current working directory of R. By default, the current working directory is where we open the R script, and can be checked by the function `getwd` (you may see the output different on your computer):
+
+```{r}
+getwd()
+```
+
+The file `usa_covid.csv` is stored in the subdirectory `data/` under the working directory. To specify the relative path, you can press `tab` to see all listed directory, select `data/` and press `tab` again to go into the subdirectory, then press `tab` to see files listed in the `data/` subdirectory and select the file. 
+
+Two other commonly used notations in the relative path is dot `.` and double dots `..`. Dot means to look at the current directory and double dots mean to look at the parent directory (one folder up).
+
+```{r}
+dat = read_csv("data/usa_covid.csv")
+dat = read_csv("./data/usa_covid.csv") # ./ for current directory
+dat = read_csv("../Week2/data/usa_covid.csv") # ../ for parent directory
+```
+
+We can also use the full (absolute) path to read files. On Mac and Linux, full path always starts with the slash `/`. This is also how R distinguishes relative and full path. On Windows, full path always starts with the desk. An example would be "C:/Users/gz/Desktop/Course/BIOL59500IB/Week2/data/usa_covid.csv".
+
+```{r}
+dat = read_csv("/Users/gz/Desktop/Course/BIOL59500IB/Week2/data/usa_covid.csv") # use tab for auto-completion
+```
+
+Note that we prefer to use relative path as opposed to the full path because it is portable to different systems. The full path on my computer may not work on your computer. 
+
+### Space separated text files
+
+We can use the `read_delim` function to read the text file. We need to specify the path to the file and also the single character used to separate fields within the txt file (often " " for space separared and "\t" for tab separated). For our example, the text file is tab separated
+
+```{r}
+dat = read_delim("data/usa_covid.txt", delim="\t") # read_tsv("data/usa_covid.txt")
+```
+
+### How to know the separator and the header
+
+How do we know the field separator of a file and whether a file has a header? We can use ``readLines` to read the first two lines of a file. For `"data/usa_covid.csv`, we see that clearly the field separartor is comma and the first line is the header. For `"data/usa_covid.txt`, similarly we see that the field separator is tab and the first line is header. 
+
+For a file without a header, we can set the option `col_names=FALSE` inside the `read_csv` or `read_delim` function.
+
+```{r}
+readLines("data/usa_covid.csv", n=2)
+readLines("data/usa_covid.txt", n=2)
+```
+
+### R binary 
+
+R also supports export and import of R objects. For example, we have a R object `dat` and we can export it to the desk using the function `save` and import the save object to R using the function `load`.
+
+```{r}
+save(dat, file="data/usa_covid.rda")
+load("data/usa_covid.rda")
+```
+
+## Exporting data
+
+We can also output the data table in R to txt file or spreadsheet using functions `write_delim` and `write_csv`.
+
+```{r}
+write_delim(dat, path="data/usa_covid.txt", delim="\t", col_names=TRUE)
+write_csv(dat, path="data/usa_covid.csv", col_names=TRUE)
+```
+
+## Data table
+
+We read the US covid 19 data into the data table format. Data table is provided by the R pacakge `data.table`, which is one of the most popular R pacakge for data analysis. In this section, we will illustrate basic operations to data table. First, we can see the column names of our data:
+
+```{r}
+head(dat)
+colnames(dat)
+```
+
+### Selecting columns
+
+Below are all equivalent ways to select columns based on column names `country` and `total_cases`.
+
+First, we can select columns in a data table similar to selecting columns in a data frame:
+
+```{r}
+dat[,c("country","total_cases")] # similar to select columns data.frame
+idx_col = which(colnames(dat) %in% c("country","total_cases"))
+dat[,idx_col]
+```
+
+Second, we can use the `select` function in `dplyr` package. 
+
+```{r}
+select(dat, c("country","total_cases"))
+dat %>% select(country, total_cases)
+```
+
+Note that in `dplyr`, the pipe operator `%>%` redirects the output of the first argument (print out `dat`) to the next function (select columns). We will see more use of the pipe operator in later sections. 
+
+### Adding columns
+
+Let's add a column of the death rate, computed as total number of deaths divded by total number of cases. Note that when the total number of cases are 0, the division will produce infinite value, and we need to replace those values with NA.
+
+```{r}
+dat$death_rate = dat$total_deaths / dat$total_cases
+dat = mutate(dat, death_rate  = total_deaths / total_cases)
+head(dat$death_rate)
+dat$death_rate[is.nan(dat$death_rate)] = NA
+```
+
+Similarly, we can add another column percentage of people vaccinated, based on a total population of 340 million from 2024 census:
+
+```{r}
+dat$percent_vaccinated = dat$people_vaccinated / 340e6
+dat$percent_vaccinated[is.na(dat$percent_vaccinated)] = 0
+```
+
+
+### Subsetting and filtering
+
+Suppose we want to select dates where the new cases are greater than 1 million, we can filter like this:
+
+```{r}
+idx = which(dat$new_cases > 1e6)
+dat[idx,]$date
+filter(dat, new_cases > 1e6)$date
+dat %>% filter(new_cases > 1e6) %>% select(date)
+```
+
+Note that again we can use the pipe operator to redirect the output from `filter` to the input for the `select`.
+
+### Sorting
+
+We can order rows of a data table. Suppose we want to know which date had the largest new cases, we can sort the data table by new cases as below:
+
+```{r}
+dat[order(dat$new_cases),] %>% select(date, new_cases)
+dat[order(dat$new_cases, decreasing=TRUE),] %>% select(date, new_cases)
+dat %>% arrange(desc(new_cases)) %>% select(date, new_cases)
+```
+
+### Summarization by group
+
+Finally, let’s summarize the data by dividing it into two groups: dates when the total vaccination percentage was greater than 50%, and dates when it was less than 50%. For each group, we calculate the daily death rate and then compare the average daily death rates between the two groups.
+
+```{r}
+dat$vacc_group = dat$percent_vaccinated > 0.5
+table(dat$vacc_group)
+
+dat$death_rate_per_day = dat$new_deaths / dat$new_cases
+dat$death_rate_per_day[dat$new_cases == 0] = NA
+
+dat %>% group_by(vacc_group) %>% 
+    summarise(average=mean(death_rate_per_day, na.rm=TRUE))
+```
+
+

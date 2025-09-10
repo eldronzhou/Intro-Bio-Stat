@@ -1,0 +1,145 @@
+---
+title: "Week1_2"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+## Programming Basics
+
+R is a programming languages. In this session, we will teach the basics of R programming. Together with the data types taught in the last lecture, these form the building blocks of advanced data analysis. We will focus on five main areas: mathematical operations, conditional expression, for-loops, Customized functions, and vectorization.
+
+### Mathematical operations
+
+Below are basic mathematical operation you can perform in R.
+
+```{r}
+a = 1 + 3
+a = 1 * 3
+a = 1 / 3
+a = 2^3
+a = sqrt(2)
+a = 2 * 2 + 3
+a = 2 * (2 + 3)
+```
+
+### Conditional Expression
+
+Conditional expression is commonly used to select data entries satisfying certain criteria. Recall that we already encountered the conditional expression in the last lecture:
+
+```{r}
+b = c("Biostatistics","Genetics","Computer Science")
+b == "Biostatistics"
+b != "Biostatistics"
+b %in% c("Biostatistics","Genetics")
+
+a = c(1,2,3)
+a > 1
+```
+
+Another commonly used conditional expression is if-else arguments to execute code based on conditions. 
+
+```{r}
+if (a[1] == 1) {
+    print("First element of a is 1.")
+} else {
+    print("First element of a is not 1.")
+}
+```
+
+### For loops
+
+For loop is used to repeatedly perform the same task with changing only the loop index $i$
+
+```{r}
+for (i in 1:5) {
+    print(i) # print the index of the loop
+}
+```
+
+Below is another example of using for loop to perform simple task of summing continuous integers from 0 to 100.
+
+```{r}
+tot_sum = 0
+for (i in 1:100) {
+    tot_sum = tot_sum + i
+}
+tot_sum
+```
+
+We may further combine for loop with the conditional expression to perform the same task with conditions. For example, we can sum all even integers from 0 to 100 using the following code:
+
+```{r}
+tot_sum = 0
+for (i in 1:100) {
+    if (i %% 2 == 0) { # %% takes the remainder of the division
+        tot_sum = tot_sum + i
+    }
+}
+tot_sum
+```
+
+### Customized functions
+
+Functions are useful as they provide a succint way to perform same operations with different inputs. R has many useful built-in functions. But sometimes we may need to define customized function to perform operations. We have calculated the sum of 1 to 100 in the previous section. How can we calculate the sum of integers from 1 to 500 or from 1 to 1000? We can copy the code in the previous section and modify 100 to 500 or 1000, but this becomes tedious if we have to copy paste the code every time we want to change the upper bound of the summation. Function allows us to elegantly reuse the code with small modification applied to the input $n$.
+
+```{r}
+my_sum = function(n) {
+    tot_sum = 0
+    for (i in 1:n) {
+            tot_sum = tot_sum + i
+    }
+    tot_sum # or return tot_sum
+}
+    
+my_sum(500)
+my_sum(1000)
+```
+
+In general, function has the following format:
+
+```{r, eval=FALSE}
+my_function = function(VARIABLE_NAME) {
+    perform operations on VARIABLE_NAME and calculate VALUE
+    VALUE 
+}
+```
+
+### Vectorization
+
+We have learned how to use for loop to perform repetitive tasks. Generally speaking, R is a script language and is not efficient to process the for loop. Therefore, we often prefer to use vectorization than for loop as it is faster and shorter, especially for numerical task. 
+
+We will start by introducing the idea of vectorization. We can use for loop to calculate the square root of a vector $a$. Alternatively, we can apply the function `sqrt` directly to the vector $a$. Many function in R can directly handle vector/matrix as the input by applying the operation implicitly to each element of the vector/matrix simutaneously. The second way is preferred as 1) the code is shorter, 2) it is faster although the speed difference is negligible in our example.
+
+```{r}
+a = 1:5
+b = c()
+for (i in 1:length(a)) {
+    b[i] = sqrt(a[i])
+}
+b
+sqrt(a)
+```
+
+Another example would be adding two vector together. We can see that R implicitly adds each element of $x$ and $y$. Alternativly, we would be using a for loop to perform the test. Note that this also applied to substraction *+*, multiplication *-*, division */*, power *^*, and mathematical function such as taking exponentials *exp* and logarithms *log*. 
+
+```{r}
+x = 1:4
+y = 6:9
+x + y
+
+output = c()
+for (i in 1:4) {
+    output[i] = x[i] + y[i]
+}
+output
+```
+
+
+
+
+
+
+

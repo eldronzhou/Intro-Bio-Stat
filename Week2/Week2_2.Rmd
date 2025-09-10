@@ -1,0 +1,228 @@
+---
+title: "Week2_1"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+## Importing data
+
+In data analysis, we often need to integrate multiple datasets. For instance, to study the relationship between economics and COVID-19, we can combine COVID-19 data with GDP data. Let’s load the complete COVID-19 dataset, which includes data for all countries, along with the GDP dataset, both downloaded from OWID.
+
+```{r}
+library(readr)
+library(dplyr)
+library(data.table)
+dat = read_csv("data/compact.csv")
+gdp = read_csv("data/gdp.csv")
+```
+
+## Joining tables
+
+We will use pre-pandemic GDP of year 2019. Let's first look at two datasets, denote covid data as table 1, and gdp data as table 2. Ideally, we want to merge the two tables row-wise based on the column that contains country names.
+
+
+```{r}
+gdp = gdp[gdp$Year == 2019,]
+colnames(gdp)[4] = "gdp2019"
+head(gdp)
+head(dat)
+```
+
+Table 1 contains 262 unique countries, while Table 2 has 221. This difference arises because some regions or continents are coded as ‘countries’ in both datasets. Since not every row in Table 1 has a matching entry in Table 2, we need to decide how to handle these unmatched rows.
+
+```{r}
+country1 = unique(dat$country)
+country2 = gdp$Entity
+head(country1[!country1 %in% country2]) # in table 1 but not in table 2
+head(country2[!country2 %in% country1]) # in table 2 but not in table 1
+```
+
+The `join` function in the R `dplyr` package will perform join of two tables based on matched columns. The syntax is similar to SQL. 
+
+### Left join
+
+We can use `left_join` if we want each row of table 1 to be retained after joining, regardless of whether it has a match in table 2. After joining, we can see that the jointed table `tab` has the same number of row as table 1 `dat`. For countries in table 1 with no match in table 2 `gdp`, NA will be added to the column `gdp2019`. Rows in table 2 `gdp` with no match in table 1 will be removed.
+
+```{r}
+tab = left_join(dat, gdp, by=c("country"="Entity")) 
+head(tab[tab$country == "United States",]$gdp2019) # match
+head(tab[tab$country == "Africa",]$gdp2019) # in table 1 but no match in table 2
+"Channel Islands" %in% tab$country # in table 2 but not match in table 1
+```
+
+### Right join
+
+For `right_join`, each row of table 2 will be retained and twos in table 1 with no match to table 2 will be removed.
+
+```{r}
+tab = right_join(dat, gdp, by=c("country"="Entity"))
+"Africa" %in% tab$country # in table 1 but no match in table 2
+"Channel Islands" %in% tab$country # in table 2 but not match in table 1
+```
+
+### Inner join
+
+For `inner_join`, only common rows in table 1 and table 2 will be retained.
+
+```{r}
+tab = inner_join(dat, gdp, by=c("country"="Entity")) 
+"Africa" %in% tab$country # in table 1 but no match in table 2
+"Channel Islands" %in% tab$country # in table 2 but not match in table 1
+```
+
+### Full join
+
+For `full_join`, oll rows in table 1 and table 2 will be retained regardless of whether there is a match.
+
+```{r}
+tab = full_join(dat, gdp, by=c("country"="Entity")) 
+"Africa" %in% tab$country # in table 1 but no match in table 2
+"Channel Islands" %in% tab$country # in table 2 but not match in table 1
+```
+
+### Semi join
+
+For `semi_join`, rows in table 1 with a match in table 2 will be retained. 
+
+```{r}
+tab = semi_join(dat, gdp, by=c("country"="Entity")) 
+"Africa" %in% tab$country # in table 1 but no match in table 2
+"United States" %in% tab$country # in table 2 but not match in table 1
+```
+
+### Anti join
+
+`anti_join` is opposite to `semi_join`, where rows in table 1 with no match in table 2 will be retained.
+
+```{r}
+tab = anti_join(dat, gdp, by=c("country"="Entity")) 
+"Africa" %in% tab$country # in table 1 but no match in table 2
+"United States" %in% tab$country # in table 2 but not match in table 1
+```
+
+## String processing
+
+String processing is a common task in data wrangling. It often involves extracting numerical information from character strings and transforming it into a clean format suitable for plotting and modeling in R. In practice, you’ll encounter many unique string-processing challenges in daily research and work. The case studies below highlight techniques from my own experience that I have found most useful.
+
+### Splitting and subsetting
+
+Let’s take the date column in `dat` as an example. How can we extract the year, month, and day from it? While R provides built-in functions for working with dates and times, here we’ll treat it as a string to practice string processing.
+
+We notice that year, month and day are separted by the dash sign `-`. For the date "2020-01-01", we can first split the string by the dash sign. The result is a list of character vectors containing splitted strings, with the first, second, and third element of the character vector corresponds to the year, month, and day.
+
+```{r}
+library(stringr)
+example = "2020-01-01"
+str_split(example, "-")
+str_split(example, "-")[[1]][1]
+```
+
+Now let's apply the operation to the entire date column. We will use the function `sapply` to apply the subsetting to each element of the list. 
+
+```{r}
+example = str_split(dat$date, "-")
+year = sapply(example, function(x) x[1])
+month = sapply(example, function(x) x[2])
+day= sapply(example, function(x) x[3])
+```
+
+### Regular expression
+
+In the `str_split` function, we specify the pattern to split. In general, regular expression (regex) is a way to describe patterns of characters in the string. We can find/extract/replace specific patterns in a string using various functions. We will demonstrate this by finding country in `dat` as examples.
+
+### String match
+
+String is a regex. When combining with the caret "^" or dollar "$", regex restricts the match to the beginning or the end of the string, respestively.
+
+```{r}
+country = unique(dat$country)
+country[str_detect(country, "^United")] # start with United
+country[str_detect(country, "Islands$")] # end with Islands
+```
+
+### Special characters
+
+Suppose we want to find countries containing "United" or "Islands", we can use the character "|" which represents or:
+
+```{r}
+country[str_detect(country, "United|Islands")] # United or Islands
+```
+
+### Character class
+
+Character classes are used to define a series of characters that can be matched. We define character classes with square brackets []. [a-z] represents lower case letters, [A-Z] represents upper case letters, [0-9] represents digits.
+
+```{r}
+country[str_detect(country, "[W-Z]")] # countries containing upper letters W to Z
+
+month = 1:12
+month[str_detect(month, "[4-8]")] # months containig 4 to 8
+```
+
+### Quantifiers: `*`, `+`, `?`, `{n}`
+
+Quantifiers are used to indicate how many times a pattern to be matched. `*` means zero or more instances of the previous character, `+` means one or more, `?` means zero or one, `{n}` means exact `n` times. Below are some examples to play with. 
+
+```{r}
+example = c("AB", "A1B", "A11B", "A111B", "A1111B")
+str_detect(example, "A1*B") # A, zero or more 1, B
+str_detect(example, "A1+B") # A, one or more 1, B
+str_detect(example, "A1?B") # A, zero or one 1, B
+str_detect(example, "A1{2}B") # A, exactly two 1, B 
+```
+
+### Lookarounds
+
+Lookarounds provide a way to ask for one or more conditions to be satisfied without moving the search forward or matching it. For example, you might want to check for multiple conditions and if they are matched, then return the pattern or part of the pattern that matched. There are four types of lookarounds: lookahead `A?=patternB` (find A where B follows), negative lookahead `A?!patternB` (find A where B does not follow), lookbehind `patternA?<=B` (find B where A precedes), and negative lookbehind `patternA?<!B` (find B where A does not precede). Below are toy examples of country names.
+
+```{r}
+country[str_detect(country, "United(?= States)")] # Find United followed by States
+country[str_detect(country, "United(?! States)")] # Find United not followed by States
+country[str_detect(country, "(?<=South )Korea")] # Find Korea proceeded by South
+country[str_detect(country, "(?<!South )Korea")] # Find Korea proceeded by South
+```
+
+### Groups
+
+Groups are defined with parentheses. The groups in the regex pattern can be captured. As an example, let's extract the names of excluded countries.
+
+```{r}
+example = c("World excl. China and South Korea", "World excl. China, South Korea, Japan and Singapore")
+str_extract(example, "(?<=World excl. )(.*)") # .* means anything for multiple times
+```
+
+### AI assisted string processing
+
+Regex can be complicated. We are not able to cover every regex pattern in this lecture and there are many ways to extract a desired pattern. Personally, I find AI extremely efficient and helpful to design code to solve regex problems. 
+
+Let's ask ChatGPT to design the code to extract country name China, South Korea, Japan, and Singapre in our previous example. My prompot is: "I have a vector in R example = c("World excl. China and South Korea", "World excl. China, South Korea, Japan and Singapore"). Please design regex code using groups to extract China, South Korea, Japan and Singapore."
+
+The output code by ChatGPT is: 
+
+```{r}
+# Step 1 First capture everything after "World excl."
+captured = str_match(example, "^World excl\\. (.*)")[,2]
+captured
+
+# Step 2 Extract each country name group
+str_extract_all(captured, "([A-Z][a-z]+(?: [A-Z][a-z]+)*)")
+```
+
+ChatGPT also explains the code as:
+
+`(.*)` -? Group 1: everything after "World excl. ".
+`([A-Z][a-z]+(?: [A-Z][a-z]+)*)` -> Group 2: captures each country name.
+`[A-Z][a-z]+` -> one word starting with capital.
+`(?: [A-Z][a-z]+)*` -> allows additional capitalized words (for "South Korea").
+
+Step 2 seems a little bit complicated since `([A-Z][a-z]+(?: [A-Z][a-z]+)*)` is hard to understand. We can ask ChatGPT to "Please use a simplified version for step 2 based on string split." Now the code becomes
+
+```{r}
+str_split(captured, ", | and ")
+```
+
+As we can see, ChatGPT is really powerful to solve this kind of problems. 
+
