@@ -1,0 +1,131 @@
+---
+title: "Week2_1"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+
+## Introduction
+
+Plots are powerful in revealing information in data. Data visualization is central to biologica. data analysis. We will learn how to make plots using ggplot2 in this lecture using COVID data as an example.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
+
+## ggplot2
+
+In short, ggplot2 = data + aesthetics (aes) + geometries (geom) + facets (optional) + stats (optional) + coord (optional) + theme (optional). Let's see an example by plotting daily COVID-19 cases in the US.
+
+```{r}
+dat = read_csv("../Week2/data/compact.csv")
+
+dat %>% filter(country == "United States", !is.na(new_cases)) %>% 
+       ggplot(aes(x = date, y = new_cases)) +
+  geom_line(color = "steelblue") + 
+  labs(title = "Daily COVID-19 Cases in the U.S.",
+       x = "Date", y = "New Cases") + theme_bw()
+```
+
+As we have learned in the Week 2, the first line filters data by keeeping only rows where the country is US and new cases are not missing (NA). We then pass the data to ggplot by the pipe operator `%>%`. We set up aes mapping in the `ggplot` function, where we specify the column of the data to be plotted on the x and y axis. In ggplot2, graphs are created by adding layers defined by geommetris (geom). Here, we draw lines connecting each data points. Alternatively, please refer to [this](https://posit.co/wp-content/uploads/2022/10/data-visualization-1.pdf) cheatsheet for more types of graphs. Finally, we add the title and axis labels for readability, and use a black and white theme for a clean look.
+
+## Types of plot
+
+We next show how to make some commonly used plots.
+
+### Scatterplot
+
+Scatterplot displays values for typically two quantitative variables to identify the relationship.
+
+```{r}
+dat %>% filter(country == "United States", !is.na(people_vaccinated_per_hundred), !is.na(new_cases_per_million)) %>%  
+  ggplot(aes(x = people_vaccinated_per_hundred, y = new_deaths_per_million)) +
+  geom_point(alpha = 0.7, color = "steelblue") +
+  labs(title = "Vaccination vs Daily New COVID-19 Deaths in U.S.",
+       x = "% Vaccinated", y = "Daily New Deaths per Million") +
+  theme_bw()
+```
+
+We see that generally in the early to mid stages, new deaths declined as vaccination rate increased. However, later waves showed that new deaths increased despite of high vaccination coverage, possibly due to a combination of factors such as emergence of new variants (Delta in mid-2021 and Omicron in late 2021/2022), waning immunity from vaccines, uneven vaccination coverage and behavioral/policy changes (e.g. lift of mask mandates, distancing, travel). 
+
+### Barplot
+
+Barplot shows the relationship between a numeric and a categoric variable. For example, we can plot the total cases by 5 countries up to December 2022.
+
+```{r}
+dat %>% filter(date == "2022-12-31", country %in% c("United States", "Japan", "Australia", "United Kingdom", "South Africa")) %>%
+  ggplot(aes(x = country, y = total_cases / 10^6, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total COVID-19 Cases per Million (Dec 2022)",
+       x = "Country", y = "Cases per Million") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+### Histogram
+
+Distribution is the most basic statistical summary of a list of numerical data. We will learn more about distribution in Week 4. Intuitively, you can think about distribution roughly as the description of how data is spread out. Histogram is a visual representation of the distribution. The simplest way to make a histogram is to divide the span of data into non-overlapping bins of the same size. Then, for each bin, we count the number of values that fall in that interval. The histogram plots these counts as bars with the base of the bar defined by the intervals. In the following example, we plot the new cases per million on 2021-06-01 for all countries.
+
+```{r}
+dat %>%
+  filter(date == "2021-06-01", !is.na(new_cases_per_million)) %>%
+  ggplot(aes(x = new_cases_per_million)) +
+  geom_histogram(binwidth = 50, fill = "tomato", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of New COVID-19 Cases per Million (June 1, 2021)",
+       x = "New Cases per Million", y = "Number of Countries") +
+  theme_bw()
+```
+
+### Boxplot and stratification
+
+In data analysis, we often need to divide observations into categorical groups. For example, we can divide the countries based on continent and use boxplot to compare the new cases on 07-01-2021 for each continent. 
+
+```{r}
+dat %>%
+  filter(date == "2021-06-01", !is.na(new_cases_per_million), !is.na(continent)) %>%
+  ggplot(aes(x = continent, y = new_cases_per_million, fill = continent)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(title = "COVID-19 Cases per Million by Continent (June 1, 2021)",
+       x = "Continent", y = "New Cases per Million") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+We can transform the y axis to the log scale for better comparison.
+
+```{r}
+dat %>%
+  filter(date == "2021-06-01", !is.na(new_cases_per_million), !is.na(continent)) %>%
+  ggplot(aes(x = continent, y = new_cases_per_million, fill = continent)) +
+  geom_boxplot(alpha = 0.6) + scale_y_log10() +
+  labs(title = "COVID-19 Cases per Million by Continent (June 1, 2021)",
+       x = "Continent", y = "New Cases per Million") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+## AI assisted ggplot2
+
+Color by groups
+
+```{r}
+dat %>% filter(country == "United States" & !is.na(people_vaccinated_per_hundred), !is.na(new_cases_per_million)) %>%  
+  mutate(date = as.Date(date),
+         wave = case_when(
+           date < as.Date("2021-06-01") ~ "Pre-Delta",
+           date >= as.Date("2021-06-01") & date < as.Date("2021-12-01") ~ "Delta",
+           date >= as.Date("2021-12-01") ~ "Omicron"
+         )) %>%
+  ggplot(aes(x = people_vaccinated_per_hundred, y = new_deaths_per_million, color = wave)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Vaccination vs Daily New COVID-19 Deaths in U.S.",
+       x = "% Vaccinated", y = "Daily New Deaths per Million") +
+  theme_bw()
+```
+
