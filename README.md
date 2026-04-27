@@ -9,7 +9,7 @@ Lecture Slides
 
 [Exploratory Data Analysis and Statistical Thinking](https://docs.google.com/presentation/d/1jFEcuFznstDwancLx24_xcaBwOjbAUS_/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true)
 
-[Probability Distribution and Sampling][https://docs.google.com/presentation/d/1k_QgFAy1K8CihJ6bWmTmSQ8OGJ7GY9jA/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true]
+[Probability Distribution and Sampling](https://docs.google.com/presentation/d/1k_QgFAy1K8CihJ6bWmTmSQ8OGJ7GY9jA/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true)
 
 [Statistical Inference](https://docs.google.com/presentation/d/13yWi4JwWo2q_dzL34_M-aUGAgGkTzTiA/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true)
 
