@@ -1,0 +1,175 @@
+---
+title: "Week14"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+This lecture will cover the essentials of dimensional reduction. 
+
+## Principal Component Analysis (PCA)
+
+We first read the dataset consisting the expression value of 100 genes across 12 samples (6 control vs 6 treatment). We transpose the matrix since PCA operates on the samples as rows and genes columns, so that each sample (instead of each gene) is represented as a point in the space. Note that the expression value of each gene has been standardized. 
+
+```{r}
+load("data/rnaseq_100genes_12samples.rda")
+expr = t(expr)
+```
+
+We visualize the expression of first two genes colored by the experiment status (treatment vs control). 
+
+```{r}
+plot(expr[,1], expr[,2], xlab="Gene 1", ylab="Gene 2", col=condition, pch=19)
+legend("topleft", legend=levels(condition),
+    col=1:length(levels(condition)), pch=19)
+```
+
+We have 100 genes in this dataset. It is impossible to visualize the expression value of 100 genes by human eyes, so we need to reduce the dimensionality of the dataset. 
+
+Principal component analysis (PCA) is a widely used linear dimension reduction technique that transforms the original high-dimensional gene expression data into a smaller set of orthogonal variables, called principal components, which capture the maximum variance in the data. 
+
+Below we will demonstrate the idea of PCA by a simple example of two genes. We will reduce the dimension from 2 to 1 by projecting the data to a line.
+
+Before applying PCA, it is common practice to center the data (subtract the mean) and scale it (divide by the standard deviation), especially when variables are measured on different scales.
+
+The output of `prcomp` is a list that includes several key components: the principal components (`$x`), which represent the projected data in the new coordinate system; the standard deviations of the principal components (`$sdev`), which reflect the amount of variance explained by each component; and the principal component loadings (`$rotation`), which define the directions of the principal components.
+
+```{r}
+pca = prcomp(expr[,1:2], center=TRUE, scale.=TRUE)
+pca$sdev
+head(pca$x)
+head(pca$rotation)
+```
+
+Below we demonstrate the projection. The first PC is the line passing the center of the data $(m_x, m_y)$ with slope $b = w_2 / w_1$, where $w = (w_1, w_2)$ is the directional vector of the PC. 
+
+Each data point can then be projected onto this line, yielding its coordinate along PC1. We can visualize this by marking the projected points on the principal component line and drawing perpendicular segments that connect each original data point to its projection.
+
+```{r}
+plot(expr[,1], expr[,2], xlab="Gene 1", ylab="Gene 2", col=condition, pch=19, asp=1)
+legend("topleft", legend=levels(condition),
+    col=1:length(levels(condition)), pch=19)
+
+# slope of PC1
+w = pca$rotation
+slope = w[2] / w[1]
+
+# draw projection line through mean
+mx = mean(expr[,1])
+my = mean(expr[,2])
+abline(a = my - slope*mx, b = slope, lwd=2)
+
+# project points onto PC1
+scores = pca$x[,1]
+
+# coordinates of projections
+proj_x = mx + scores * w[1]
+proj_y = my + scores * w[2]
+
+points(proj_x, proj_y, pch=1, col=condition)
+
+# connect original points to projection
+segments(expr[,1], expr[,2], proj_x, proj_y, col="blue")
+```
+
+We can also visualize the 1D PC.
+
+```{r}
+plot(scores, rep(0, length(scores)),  # y=0 for 1D visualization
+     pch=19, col=condition, xlab='PC1', yaxt='n',
+     main='1D Projection onto Second Principal Component')
+abline(h=0, lty=2)  # horizontal line for reference
+```
+
+We next apply PCA to the full gene expression matrix. In practice, we often examine pairwise plots of the top principal components to explore major patterns of variation in the data.
+
+```{r}
+pca = prcomp(expr, center=TRUE, scale=TRUE)
+plot(pca$x[,1], pca$x[,2], col=condition, pch=19,
+     xlab="PC1", ylab="PC2")
+plot(pca$x[,2], pca$x[,3], col=condition, pch=19,
+     xlab="PC2", ylab="PC3")
+```
+
+Below we explain the mathematics behind PCA. In the lecture, it is shown that PCA works by finding a set of orthonormal eigenvectors $w_i$ satisfying $X^TX w_i = \lambda w_i$. This can be achieved by performing SVD as $X = U \Sigma V^T$, since SVD produces matrix $U^T U = I, V^T V = I$. $\Sigma$ is a  diagonal matrix consisting square roots of eigenvalues of $X^TX$ (singular value). 
+
+Note that the columns of $V$ contain the direction of the principal components, $XV = U\Sigma$ are the projected data. 
+
+```{r}
+u = svd(expr)$u 
+d = svd(expr)$d
+plot(u[,1]*d[1], u[,2]*d[2], col=condition, pch=19,
+     xlab="PC1", ylab="PC2")
+```
+
+## tSNE and UMAP
+
+We will use the Swiss roll dataset to illustrate the concept of nonlinear dimensionality reduction. The code to generate the dataset was obtained from ChatGPT, so we will take it as given without further explanation.
+
+```{r}
+set.seed(1)
+
+n = 1000
+t = runif(n, 0, 3*pi)
+h = runif(n, 0, 10)
+
+X = cbind(x=t*cos(t), y=h, z=t*sin(t))
+
+df = data.frame(X, t=t)
+
+library(scatterplot3d)
+scatterplot3d(df$x, df$y, df$z,
+  color=rainbow(n)[rank(df$t)],
+  pch=16, main = "Swiss Roll (3D scatterplot)")
+```
+
+First, we apply PCA and we see that points in the inner part of the roll are not separated, because PCA performs a linear projection and cannot unfold the roll.
+
+```{r}
+pca = prcomp(df, center=TRUE, scale.=TRUE)
+
+plot(pca$x[,1], pca$x[,2],
+  col=rainbow(n)[rank(df$t)],
+  pch=16, main="PCA of Swiss Roll")
+```
+
+For t-SNE, the roll is effectively unrolled. Note that t-SNE is stochastic—running it multiple times can produce different layouts. In addition, the visualization is sensitive to the choice of perplexity (effective number of neighbors), and changing this parameter can lead to noticeably different results.
+
+```{r}
+library(Rtsne)
+tsne = Rtsne(df)
+
+plot(tsne$Y, col=rainbow(n)[rank(df$t)],
+  pch=16, main = "t-SNE of Swiss Roll Perplexity = 30")
+
+tsne = Rtsne(df, perplexity=5)
+plot(tsne$Y, col=rainbow(n)[rank(df$t)],
+  pch=16, main = "t-SNE of Swiss Roll Perplexity = 5")
+
+tsne = Rtsne(df, perplexity=100)
+plot(tsne$Y, col=rainbow(n)[rank(df$t)],
+  pch=16, main = "t-SNE of Swiss Roll Perplexity = 100")
+```
+
+UMAP works similar to tSNE. The local structure is preserved. Changing the parameter n_neighbors will produce different layouts.
+
+```{r}
+library(uwot)
+umap_res = umap(df)
+plot(umap_res, col=rainbow(n)[rank(df$t)],
+  pch=16, main="UMAP of Swiss Roll n_neighbors = 15")
+
+umap_res = umap(df, n_neighbors=5)
+plot(umap_res, col=rainbow(n)[rank(df$t)],
+  pch=16, main="UMAP of Swiss Roll n_neighbors = 5")
+
+umap_res = umap(df, n_neighbors=100)
+plot(umap_res, col=rainbow(n)[rank(df$t)],
+  pch=16, main="UMAP of Swiss Roll n_neighbors = 100")
+```
+
+For the practice of applying tSNE/UMAP to real single cell data, please refer to https://satijalab.org/seurat/articles/pbmc3k_tutorial.html for a simple tutorial. We focus on explaining the intuition behind tSNE/UMAP in this lecture, but working with real examples will not be hard once you understand the intuition.
+
+
