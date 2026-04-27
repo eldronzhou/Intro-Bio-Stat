@@ -1,7 +1,7 @@
 # Intro-Bio-Stat
 BIOL59500IB/STAT 59800 Introduction to Biostatistics
 
-This is a 16 week graduate/senior undergraduate level course taught at Purdue University Spring 2026. Students come in with a mixed background. Most of them are biology students who do not have prior exposure to programming and statistics. An overview of the class is provided in the [syllabus](https://docs.google.com/document/d/1vgDzWaNQg6Rb0hg3jHHm0UgOxuhOSZwR/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true). 
+This is a 16 week graduate/senior undergraduate level course taught at Purdue University Spring 2026. Students come in with a mixed background. Most of them are biology students who do not have prior exposure to programming and statistics. An overview of the class is provided in the [syllabus](https://docs.google.com/document/d/1vgDzWaNQg6Rb0hg3jHHm0UgOxuhOSZwR/edit?usp=sharing&ouid=113599774719236499884&rtpof=true&sd=true). The course is divided into lecture and lab session, and encourages the responsible use of AI.
 
 Lecture Slides
 
