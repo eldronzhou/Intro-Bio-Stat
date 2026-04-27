@@ -1,0 +1,170 @@
+---
+title: "Week9"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+## Correlation
+
+We read the Galton's height data into R. For each family, we select male, and for each family select the height of father and child. Heights of more than one children in each family are aggregated by the average. We then plot the height of child versus height of father. We use `cor` function to compute the Pearson's correlation. 
+
+```{r}
+library(dplyr)
+library(readr)
+height = read_tsv("galton-stata11.tab")
+height = height %>%  filter(gender == "M") %>%  group_by(family) %>% 
+    summarise(
+    father = first(father),
+    child = mean(height) )
+plot(height$father, height$child, xlab="Height of Father", ylab="Height of Child")
+cor(height$child, height$father)
+```
+
+# Simple linear regression
+
+To perform simple linear regression, we treat child's height as the response variable $y$ and father's height as the covariate/explanatory variable $x$. We assume there is a linear relationship between $y$ and $x$. `lm` function in R will fit the linear regression model for us by minimizing the sum of squared residuals. `lm` function returns an object of class "lm" to store the results from the regression. We can use the function `summary` to view these results, or extract specific components from the model object using the dollar sign.
+
+```{r}
+y = height$child
+x = height$father
+model = lm(y~x)
+plot(height$father, height$child, xlab="Height of Father", ylab="Height of Child")
+abline(model, col="blue", lwd=2)
+y_hat = model$fitted.values # give us _hat
+segments(x0=x, y0=y, x1=x, y1=y_hat, col="red")
+
+summary(model)
+model$coefficients
+```
+
+## Matrix algebra
+
+In this section, we introduce basics of matrix algebra. We first create vector and matrix. 
+
+```{r}
+Y = c(1,2,3)
+X = matrix(c(1,3,5,2,4,7,3,6,9), nrow=3, ncol=3, byrow=TRUE)
+dim(X) # dimension of a matrix
+t(X) # transpose of a matrix
+```
+
+Vector/matrix addition is applied to each element of the matrix.
+
+```{r}
+Y2 = c(1, 4, 5)
+Y + Y2
+Z = matrix(c(1,4,5,3,6,9,3,6,9), nrow=3, ncol=3, byrow=TRUE)
+X + Z
+```
+
+We can also multiply or divide a matrix or vector by a scalar element-wise using the standard `*` or `/` operators.
+
+```{r}
+2 * Y # element-wise
+2 * X # element-wise
+X * Z # element-wise
+X / Z # element-wise
+```
+
+Matrix vector or matrix matrix multiplication is different from element-wise multiplication. In R, we use the operator `%*%` for matrix multiplication.
+
+```{r}
+X %*% Y
+X %*% Z
+Z %*% X # Note ZX does not equal XZ
+```
+
+We use `solve` function to solve the linear systen $Ax=b$ where $X$ is a square matrix and $b$ is a vector or a matrix. Note that when $b$ is missing, the function will return the inverse of $A$. $A$ does not always have the inverse. For example, if $A$ is non-square or not full rank (one row/column is the linear combination of other rows/columns), $A$ is not invertible. 
+
+```{r}
+z = c(22, 31, 42)
+solve(X, z)
+solve(X)
+solve(X) %*% X
+solve(X) %*% z
+#solve(X[1:2,]) # non-square matrix
+#solve(X) # third row is the linear combination of other rows (0*first_row + 1*second_row)
+```
+
+## Multiple regression
+
+To introduce multiple regression, we first read the mice experiment data and select 6 mice. 
+
+```{r}
+pheno = read.csv("mice_pheno.csv")
+set.seed(10)
+idx = sample(1:nrow(pheno), 6)
+pheno = pheno[idx,]
+pheno
+```
+
+Similar to simple linear regression, we can use `lm` to fit the model with Bodyweight as the response variable and Diet as the explanatory variable. We want to test whether the second element of $\beta = 0$, corresponding to high fat diet. Our design matrix is $X$, where the first column is the intercept, and the second column is the factor coding high fat diet as 1. If we wish to code control as 1 and high fat as 0, we can change the level of the factor.
+
+```{r}
+fit = lm(Bodyweight~Diet, data=pheno)
+summary(fit)
+
+pheno$Diet = factor(pheno$Diet, level=c("hf","chow"))
+(X = model.matrix(~Diet, data=pheno))
+
+pheno$Diet = factor(pheno$Diet, level=c("chow","hf"))
+(X = model.matrix(~Diet, data=pheno))
+```
+
+Below we break down how R gets these numbers in the summary output. The least square estimator $\hat{\beta} = (X^TX)^{-1}X^TY$. For t test, we compute the test statistics as $t = \frac{\hat{\beta}_i}{\sqrt{s^2(X^TX)^{-1}_{ii}}}$ where $s^2$ is the sum of squared residuals divided by $n - p$. Under null hypothesis that $\hat{\beta}_i=0$, $t$ follows a t-distribution with degree of freedom equals $n - p$.
+
+```{r}
+(beta_hat = solve(t(X) %*% X) %*% t(X) %*% pheno$Bodyweight)
+(residual = pheno$Bodyweight - X %*% beta_hat) # fit$residual
+(s2 = sum(residual^2) / (6 - 2)) # n: numer of samples p: number of covariates
+solve(t(X) %*% X) 
+(t = beta_hat[2] / sqrt(s2*2/3))
+(2*pt(abs(t), df=6-2, lower.tail=FALSE))
+```
+
+We fail to reject the null hypothesis at $P < 0.05$, because the sample size is small.
+
+## ANOVA
+
+ANOVA tests whether selected components of the $\beta$ vector are equal to zero, which corresponds to testing whether the means of the associated groups are equal. For example, if the second and third elements of $\beta$ are zero, then this is equivalent to stating that the mean weight being equal between high-fat diet and control diet, also between male and female. If we reject the null hypothesis, then at least one of the two group means is not equal.
+
+In R, we fit two models. The first is the reduced model with only intercept, corresponding to the second and third element of $\beta$ being 0. The second model is the full model including Diet and Sex as the additional covariates. `anova` gives the F statistics, and p value. In this case, we fail to reject the null hypothesis.
+
+```{r}
+(X = model.matrix(~Diet+Sex, data=pheno))
+fit_reduced = lm(Bodyweight~1, data=pheno)
+fit = lm(Bodyweight~Diet+Sex, data=pheno)
+anova(fit_reduced, fit)
+```
+
+Below let's break down how `anova` function computes those numbers. In the lecture, we talked about the definition of F statistics as $F = \frac{\text{SSR_r-SSR_f}/(p-r)}{\text{SSR_f}/(n-p)}$ follows $F(p-r,n-p)$ under the null hypothesis. Here, $\text{SSR_r}$ is the sum of squared residuals of the null model, $\text{SSR_f}$ is the sum of squared residuals of the full model, $n$ is the total sample size, $r$ is the number of columns in the design matrix of the reduced model, and $p$ is the number of columns in the design matrix of the full model.
+
+```{r}
+num = (sum(fit_reduced$residuals^2) - sum(fit$residuals^2)) / (3 - 1)
+denom = sum(fit$residuals^2) / (6 - 3)
+f = num / denom
+pf(f, df1=3-1, df2=6-3, lower.tail=FALSE)
+```
+
+## Colinearity and interaction
+
+Finally, let’s discuss collinearity among the covariates. Collinearity occurs when one column of the design matrix is a linear combination of other columns. In the toy example below, we intentionally set the sex factor to have the same entries as the diet factor. When we fit the model, we observe that $\hat{\beta}_3$ is reported as NA. This happens because the model cannot distinguish the effect of sex from the effect of diet—they provide exactly the same information. Mathematically, this means that $X^TX$ is not invertible, and the corresponding coefficient cannot be uniquely estimated.
+
+```{r}
+X[,3] = X[,2]
+X
+#solve(t(X)%*% X)
+lm(pheno$Bodyweight~-1+X) # remove the intercept
+```
+
+We may also want to include the interaction between diet and sex into the model. For the interaction, we simply put an additional covariate equal to the product of the diet and sex indicators. This allows the effect of diet to differ between males and females, rather than assuming a single diet effect for both sexes. And we can use either t test to test whether the interaction effect (forth element of $\beta$) is 0.
+
+```{r}
+(X = model.matrix(~Diet+Sex+Diet*Sex, data=pheno))
+summary(lm(Bodyweight~Diet+Sex+Diet*Sex, data=pheno))
+```
+
+
