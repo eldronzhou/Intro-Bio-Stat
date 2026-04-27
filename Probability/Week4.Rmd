@@ -1,0 +1,145 @@
+---
+title: "Week4"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+In this session, we will illustrate some concepts in this week's lecture by Monte Carlo experiments and numerical computation. 
+
+## Monte Carlo Simulation
+
+Let's start with fair dice roll. Each roll is a random draw from the numbers 1 to 6, each with equal probability 1/6. We can use function `sample` to randomly selects one number between 1 and 6. Note that if we run the same sample command twice, the output number will be difference due to the randomness.
+
+```{r}
+sample(1:6, 1)
+sample(1:6, 1)
+sample(1:6, 1)
+sample(1:6, 1)
+```
+
+We can set a random seed before calling `sample`. After setting the seed, the generator will output the same sequence of the number.
+
+```{r}
+set.seed(1)
+sample(1:6, 1)
+sample(1:6, 1)
+set.seed(1)
+sample(1:6, 1)
+sample(1:6, 1)
+```
+
+Now let’s simulate $10^5$ dice rolls and check how often each number appears. Each value should appear approximately $1/6 \approx 0.167$.
+
+```{r}
+n = 10^5
+a = sample(1:6, n, replace=TRUE)
+table(a) / 10^5
+```
+
+## Probability distribution in R
+
+R has many built in probability distribution functions. In general, probability density/mass function starts with `d`, cumulative distribution function starts with `p`, quantile function starts with `q`, and sampling function starts with `r`.
+
+### Binomial distribution
+
+Binomial distribution models the number of “successes” in $n$ independent Bernoulli trials, each with probability $p$ of success. Bernouli distribution is a special case of binomial distribution with $n = 1$.
+
+As seen in the lecture, binomial distribution with $n = 2$ can be used to describe the probability of observing AA, Aa, aa In a homogeneous human population. Denote $G$ as the number of A alleles, and let the allele frequency $p$ to be $0.3$, we can simulate the genotype of 1000 individuals from $G \sim Bin(2, p)$ as:
+
+```{r}
+set.seed(2)
+N = 1000
+p = 0.3
+G = rbinom(N, 2, p)
+table(G) 
+```
+
+Suppose we want to know the theoretical probability of observing Aa or aa, we can calculate as $Pr[X \leq 1] = Pr[X = 0] + Pr[X = 1]$.
+
+```{r}
+pbinom(1, 2, p) # Pr[X <= 1]
+dbinom(0, 2, p) + dbinom(1, 2, p) # Pr[X = 0] + Pr[X = 1]
+(495 + 411) / N # observed in the simulation data
+```
+
+### Normal distribution
+
+Many quantitative traits in biology, such as height, blood pressure, or gene expression levels, approximately follow a Normal distribution.
+
+Let's simulate the height in cm $X \sim N(170, 10)$ for 10,000 individuals. We can plot the histogram of the simulated height using `hist` function in base R, and add the probability density funxtion of normal distribution.
+
+```{r}
+set.seed(2)
+N = 10000
+mu = 170
+sigma = 10
+X = rnorm(N, mu, sigma)
+hist(X, breaks=20, col="lightblue", main="Simulated Heights",
+     xlab="Height (cm)", freq=F)
+plot(function(x) dnorm(x, mu, sigma), 130, 210, add=TRUE)
+```
+
+We can also confirm that the mean and standard deviation of $X$ is expected.
+
+```{r}
+mean(X)
+sd(X)
+```
+
+Let's ask a question, what is the probability of observing height smaller or equal to 180 cm? First, we can use `pnorm`. Recall that, `pnorm(a, mu, sigma)` calculates $F(a) = Pr[X \leq a]$ where $X \sim N(\mu, \sigma)$. 
+
+```{r}
+pnorm(180, mu, sigma)
+```
+
+We can also try numerical integration of the probability density function from negative infinity to 180 cm, since the area under pdf up to 180 cm 
+
+```{r}
+integrate(function(x) dnorm(x, 170, 10), lower=-Inf, upper=180)
+```
+
+Finally, let's confirm that in our simulated data, the observed proportion of people with height smaller or equal to 180 cm matches the theoretical calculation:
+
+```{r}
+mean(X <= 180)
+```
+
+We have calculated the probability of observing height smaller or equal to 180 cm in three ways. How about the probability of observing height greater than 180 cm? The answer is simple as $Pr[X > 180] = 1 - Pr[X \leq 180]$. In `pnorm`, you can also set the option `lower.tail=FALSE`.
+
+```{r}
+1 - pnorm(180, mu, sigma)
+pnorm(180, mu, sigma, lower.tail=FALSE)
+```
+
+## Quantile and QQplot
+
+We haven't talked too much about the quantile. What if we want to ask how tall should I be to be taller than 99% of people? In other words, we are asking $a$ such as $Pr[X \leq a] = 0.99$ and $a$ is called as 99% quantile. We can use `qnorm` function to do this.
+
+```{r}
+qnorm(0.99, mu, sigma)
+pnorm(193.2635, mu, sigma)
+```
+
+Quantile also allows us to compare the shape of two distribution. QQplot is a powerful plot to compare two probability distributions by plotting their quantiles against each other. A point (x, y) on the plot corresponds to one of the quantiles of the second distribution (y-coordinate) plotted against the same quantile of the first distribution (x-coordinate). If two distributions are similar, the quantiles should be approximately lie on the identity line $y = x$.
+
+Let's plot the empirical quantiles of our simulated data on the x-axis, versus the theoretical quantiles of the normal distribution.
+
+```{r}
+a = seq(0, 1, by=0.005)
+x = a
+y = a
+for (i in 1:length(a)) {
+    x[i] = quantile(X, a[i])
+    y[i] = qnorm(a[i], mu, sigma)
+}
+plot(x, y, xlab="Quantiles of simulated heights", ylab="Quantiles of N(170, 10)")
+abline(0,1)
+```
+
+
+
+
+
