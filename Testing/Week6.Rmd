@@ -1,0 +1,199 @@
+---
+title: "Week6"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+## Overview
+
+Let's use $X_1, ..., X_n$ to denote mice in the treatment group, $Y_1, ..., Y_m$ to denote mice in the control group. We will use Monte Carlo simulations to simulate $X_i \sim N(\mu_x, \sigma^2)$ and $Y_i \sim N(\mu_y, \sigma^2)$. Of course, in real experiments we never know the true data-generating distribution or its parameters. The purpose of this lecture using Monte Carlo simulation is to help you understand the intuition behind the hypothesis testing, and what is p value, type I error and type II error. 
+
+## Z-test
+
+Let's assume that the population mean weight of mice in treatment group is 38 ounce ($\mu_x = 38$), and the population mean weight of mice in control group is 35 ounce ($\mu_y = 35$). By doing experiments, we sample $n = 30$ mice for each group from normal distribution with the standard deviation as 3 ounce $\sigma = 3$. After we weigh mice in each group, we compute the sample mean $\hat{\mu_x}, \hat{\mu_y}$, sample variance $s_x^2, x_y^2$, and the test statistics (z score) according to the formula. We then compute the p value of two-sided test according to the fact that under the null hypothesis, the test statistics should approximately follow the normal distribution $N(0,1)$. 
+
+```{r}
+set.seed(1)
+mu_x = 38
+mu_y = 36
+n = 30
+
+x = rnorm(n, mu_x, 3)
+y =  rnorm(n, mu_y, 3)
+
+z = (mean(x) - mean(y)) / sqrt(var(x)/length(x) + var(y)/length(y))
+2*pnorm(abs(z), lower.tail=FALSE)
+```
+
+We can also empirically verify that under the null hypothesis ($\mu_x = \mu_y$), the test statistics should approximately follow the normal distribution $N(0,1)$. We do this by setting $\mu_x = \mu_y = 36$, repeat the sampling process and compute the test statistics for 5000 times. As shown by QQplot, the sampling distribution of test statistics is indeed consistent with the standard normal distribution under the null hypothesis. We can also compute the p value empirically according to the definition: the proportion of the sampled test statistics same as or more extreme than the observed statistics.
+
+```{r}
+set.seed(1)
+n = 30
+res = replicate(5000, {
+  mu_x = 36
+  mu_y = 36
+  x = rnorm(n, mu_x, 3)
+  y =  rnorm(n, mu_y, 3)
+  (mean(x) - mean(y)) / sqrt(var(x)/length(x) + var(y)/length(y))
+})
+qqnorm(res)
+abline(0,1)
+
+hist(res, freq=F, breaks=100, xlim=c(-4,4))
+abline(v=z, col="red")
+abline(v=-z, col="red")
+curve(dnorm(x), add=TRUE)
+
+mean(res >= abs(z)) + mean(res <= -abs(z))
+```
+
+The confidence interval can be computed as below:
+
+```{r}
+(mean(x) - mean(y)) - qnorm(1-.05/2) * sqrt(var(x)/length(x) + var(y)/length(y))
+(mean(x) - mean(y)) + qnorm(1-.05/2) * sqrt(var(x)/length(x) + var(y)/length(y))
+```
+
+## t test
+
+Not let's change $n = 30$ to $n = 3$ and repeat the sampling process above. The sampling distribution of the test statistics under the null hypothesis is no longer well-approximated by the standard normal distribution. Instead, it follows a t-distribution. The degree of freedom of the t-distribution is $2n-2$ according to the equal variance setting in the lecture. t-distribution has heavier tails because it is more likely to observe extreme test statistics in small samples (sample standard deviation is small).
+
+```{r}
+set.seed(1)
+n = 3
+mu_x = 38
+mu_y = 36
+x = rnorm(n, mu_x, 3)
+y =  rnorm(n, mu_y, 3)
+
+res = replicate(5000, {
+  mu_x = 36
+  mu_y = 36
+  x = rnorm(n, mu_x, 3)
+  y =  rnorm(n, mu_y, 3)
+  (mean(x) - mean(y)) / sqrt(var(x)/length(x) + var(y)/length(y))
+})
+qqnorm(res)
+abline(0,1)
+
+hist(res, freq=F, breaks=100, xlim=c(-4,4), ylim=c(0, 0.5))
+curve(dnorm(x), add=TRUE)
+curve(dt(x, df=2*n-2), col="blue", add=TRUE)
+
+qqplot(qt(ppoints(length(res)), df=2*n-2), res)
+abline(0,1)
+```
+
+We can easily perform t test in R as below. By default, t test assumes unequal variance and it is the preferred option. Here, we know that the variances are equal in the simulation so we set `var.equal=TRUE`. We do not reject the null hypothesis as p > 0.05 and the 95% confidence interval contains 0, even though we know that the null hypothesis is false. 
+
+```{r}
+t.test(x, y, var.equal=TRUE)
+t = t.test(x, y, var.equal=TRUE)$statistic
+df = t.test(x, y, var.equal=TRUE)$parameter
+2*pt(abs(t), df=df, lower.tail=FALSE)
+```
+
+## P value distribution under the null hypothesis
+
+Under the null hypothesis, it can be mathematically proved that p value should be uniformly distributed. We can also empirically calculate the proportion of times that we incorrectly reject the null hypothesis ($p < 0.05$) when the null hypothesis is true. It is close to 0.05, which is expected.
+
+```{r}
+set.seed(1)
+n = 3
+res = replicate(1000, {
+  mu_x = 36
+  mu_y = 36
+  x = rnorm(n, mu_x, 3)
+  y =  rnorm(n, mu_y, 3)
+  t.test(x, y, var.equal=TRUE)$p.value
+})
+hist(res, breaks=20)
+abline(v=0.05, col="red")
+mean(res < 0.05)
+```
+
+## P value distribution under the alternative hypothesis
+
+Power is the probability to reject the null hypothesis when it is false. We can also empirically calculate the power when $\mu_x = 38, \mu_y = 35, n = 3$. If we reject the hypothesis based on $p < 0.05$, then the power is roughly 9.7%. The threshold of 0.05 is arbitrary and there is a trade-off between  minimizing Type I error and increasing the power.
+
+```{r}
+set.seed(1)
+n = 3
+res = replicate(1000, {
+  mu_x = 38
+  mu_y = 36
+  x = rnorm(n, mu_x, 3)
+  y =  rnorm(n, mu_y, 3)
+  t.test(x, y, var.equal=TRUE)$p.value
+})
+hist(res, breaks=20)
+abline(v=0.05, col="red")
+mean(res < 0.05)
+mean(res < 0.1)
+mean(res < 0.001)
+```
+
+We can also calculate the power analytically. Recall on slides 23, we know the distribution of test statistics under the alternative hypothesis is t distribution with degree of freedom $n+m-2$ and non-centrality parameter $\frac{\mu_X-\mu_Y}{\sqrt{s^2/n+s^2/m}}$. Plug in $\mu_X = 38$, $\mu_Y = 36$, $s = 3$, $n = m = 3$, we can plot the theoretical density of the test statistics as the red line. The dashed line is the distribution of test statistics under $H_0$. The threshold to define significance of two sided test from $p < 0.05$ is calculated under $H_0$ using the quantile function. The power can then be calculated according to the definition, which is the probability of observing test statistics as or more extreme than the threshold (so that $H_0$ is rejected) under $H_1$.
+
+```{r}
+set.seed(1)
+res = replicate(1000, {
+  mu_x = 38
+  mu_y = 36
+  x = rnorm(n, mu_x, 3)
+  y = rnorm(n, mu_y, 3)
+  t.test(x, y, var.equal=TRUE)$stat
+})
+hist(res, breaks=100, freq=FALSE, main="Histogram of test statistics", xlim=c(-5,10))
+lambda = (38-36) / (3 * sqrt(2/n))
+curve(dt(x, ncp=lambda, df=2*n-2), col="red", add=TRUE)
+curve(dt(x, ncp=0, df=2*n-2), add=TRUE, lty=2)
+cut = qt(1-0.05/2, df=2*n-2)
+abline(v=-cut)
+abline(v=cut)
+pt(-cut, ncp=lambda, df=2*n-2) + pt(cut, ncp=lambda, df=2*n-2, lower.tail=FALSE)
+```
+
+In R, there is a function to help you compute the power so that you don't have to do the calculation above.
+
+```{r}
+library(pwr)
+pwr.t.test(d=(38-36)/3, n=3, type="two.sample", alternative="two.sided")
+```
+
+When the sample size is large, p value can be very small even though the difference is only 0.1. Thus, it is always useful to report the 95% confidence interval, showing the magnitude of the difference.
+
+```{r}
+set.seed(1)
+n = 1e5
+mu_x = 38
+mu_y = 37.9
+x = rnorm(n, mu_x, 3)
+y = rnorm(n, mu_y, 3)
+boxplot(x, y)
+t.test(x, y, var.equal=TRUE)
+```
+
+## Multiple Hypothesis Testing
+
+Finally, let's talk about how to perform multiple testing correction in R using `p.adjust`. For Bonferoni correction, we reject the hypothesis based on $p < \alpha /m$ where $m$ is the number of the test. Equivalently, we reject the hypothesis based on $mp < \alpha$. `p.adjust` returns $mp$.
+
+```{r}
+pvals = c(0.001, 0.005, 0.01, 0.02, 0.04, 0.2, 0.5, 0.9)
+p.adjust(pvals, method="bonferroni")
+p.adjust(pvals, method="bonferroni") < 0.05
+```
+
+For FDR, we sort p value in increasing order $p_(1), ..., p_(m)$, and we reject the first four hypothesis as they satisfy $p_(k) \leq \alpha*k/m$ (the line is $y = \alpha*k/m$ ). `p.adjust` simply returns $m p_(k) / k$. 
+
+```{r}
+plot(1:length(pvals), sort(pvals))
+abline(0, 0.05/length(pvals))
+p.adjust(pvals, method="fdr")
+p.adjust(pvals, method="fdr") < 0.05
+```
+
